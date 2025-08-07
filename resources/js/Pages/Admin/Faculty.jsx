@@ -1,27 +1,22 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import AddFacultyModal from '@/Components/Admin/AddFacultyModal';
 import UpdateFacultyModal from '@/Components/Admin/UpdateFacultyModal';
 import { Plus, Search, Image as ImageIcon, Trash2, Edit, Eye, Star, Filter, Grid, List, Users } from 'lucide-react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-const Faculty = ({ auth }) => {
-    const [faculty, setFaculty] = useState([
-        { id: 1, facultyNumber: 'FAC-2023-001', fullname: 'Dr. John Smith', department: 'BSIT', rfidNumber: 'RFID-001-ABC123', status: 'Active' },
-        { id: 2, facultyNumber: 'FAC-2023-002', fullname: 'Prof. Jane Doe', department: 'BSCPE', rfidNumber: 'RFID-002-DEF456', status: 'Active' },
-        { id: 3, facultyNumber: 'FAC-2023-003', fullname: 'Dr. Robert Johnson', department: 'BSCRIM', rfidNumber: 'RFID-003-GHI789', status: 'Deactivate' },
-        { id: 4, facultyNumber: 'FAC-2023-004', fullname: 'Prof. Sarah Wilson', department: 'BSTM', rfidNumber: 'RFID-004-JKL012', status: 'Active' },
-        { id: 5, facultyNumber: 'FAC-2023-005', fullname: 'Dr. Michael Brown', department: 'BSHM', rfidNumber: 'RFID-005-MNO345', status: 'Deactivate' },
-    ]);
-
-    const [selectedStatus, setSelectedStatus] = useState('All');
-    const [searchTerm, setSearchTerm] = useState('');
+const Faculty = ({ auth, faculties, filters }) => {
+    const [selectedStatus, setSelectedStatus] = useState(filters?.status || 'All');
+    const [searchTerm, setSearchTerm] = useState(filters?.search || '');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
 
     const getStatusConfig = (status) => {
         switch (status) {
+            case 'active':
             case 'Active':
                 return {
                     bg: 'bg-emerald-500/10',
@@ -30,6 +25,7 @@ const Faculty = ({ auth }) => {
                     icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
                     dot: 'bg-emerald-500'
                 };
+            case 'inactive':
             case 'Deactivate':
                 return {
                     bg: 'bg-red-500/10',
@@ -49,8 +45,50 @@ const Faculty = ({ auth }) => {
         }
     };
 
-    const filteredFaculty = faculty.filter(facultyMember => {
-        const matchesStatus = selectedStatus === 'All' || facultyMember.status === selectedStatus;
+    // Handle search and filter changes
+    const handleSearch = (e) => {
+        const search = e.target.value;
+        setSearchTerm(search);
+        
+        // Update URL with search parameters
+        router.get(route('faculties.index'), {
+            search: search,
+            status: selectedStatus !== 'All' ? selectedStatus.toLowerCase() : undefined
+        }, {
+            preserveState: true,
+            preserveScroll: true
+        });
+    };
+
+    const handleStatusFilter = (status) => {
+        setSelectedStatus(status);
+        
+        // Update URL with filter parameters
+        router.get(route('faculties.index'), {
+            search: searchTerm,
+            status: status !== 'All' ? status.toLowerCase() : undefined
+        }, {
+            preserveState: true,
+            preserveScroll: true
+        });
+    };
+
+    // Map backend data to frontend format for compatibility
+    const mappedFaculties = faculties?.data?.map(faculty => ({
+        id: faculty.id,
+        facultyNumber: faculty.faculty_id,
+        fullname: faculty.name,
+        department: faculty.department,
+        rfidNumber: faculty.rfid_number || 'N/A',
+        status: faculty.status === 'active' ? 'Active' : 'Deactivate'
+    })) || [];
+
+    const filteredFaculty = mappedFaculties.filter(facultyMember => {
+        const matchesStatus = selectedStatus === 'All' || 
+            (selectedStatus === 'Active' && facultyMember.status === 'Active') ||
+            (selectedStatus === 'Deactivate' && facultyMember.status === 'Deactivate') ||
+            (selectedStatus === 'active' && facultyMember.status === 'Active') ||
+            (selectedStatus === 'inactive' && facultyMember.status === 'Deactivate');
         const matchesSearch = facultyMember.fullname.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             facultyMember.facultyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             facultyMember.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,43 +96,65 @@ const Faculty = ({ auth }) => {
         return matchesStatus && matchesSearch;
     });
 
-    const activeFaculty = faculty.filter(f => f.status === 'Active');
-    const deactivateFaculty = faculty.filter(f => f.status === 'Deactivate');
-
     const handleAddFaculty = (formData) => {
-        // Here you would typically send the data to your backend
-        console.log('New faculty data:', formData);
-        
-        // For demo purposes, we'll add it to the local state
-        const newFaculty = {
-            id: Math.max(0, ...faculty.map(f => f.id)) + 1,
-            facultyNumber: formData.facultyNumber,
-            fullname: formData.fullname,
+        // Map frontend field names to backend field names
+        const backendData = {
+            faculty_id: formData.facultyNumber,
+            name: formData.fullname,
+            rfid_number: formData.rfidNumber,
             department: formData.department,
-            rfidNumber: formData.rfidNumber,
-            status: 'Active'
+            status: 'active'
         };
-        
-        setFaculty([...faculty, newFaculty]);
-        setIsAddModalOpen(false);
+
+        router.post(route('faculties.store'), backendData, {
+            onSuccess: () => {
+                setIsAddModalOpen(false);
+                toast.success('Faculty member added successfully!');
+                // Refresh the page data to show the new faculty immediately
+                router.get(route('faculties.index'), {
+                    search: searchTerm,
+                    status: selectedStatus !== 'All' ? selectedStatus.toLowerCase() : undefined
+                }, {
+                    preserveState: false,
+                    preserveScroll: true
+                });
+            },
+            onError: (errors) => {
+                console.error('Validation errors:', errors);
+                toast.error('Failed to add faculty member. Please check your input.');
+            }
+        });
     };
 
     const handleUpdateFaculty = (formData) => {
-        // Here you would typically send the data to your backend
-        console.log('Updated faculty data:', formData);
+        // Map frontend field names to backend field names
+        const backendData = {
+            faculty_id: formData.facultyNumber,
+            name: formData.fullname,
+            rfid_number: formData.rfidNumber,
+            department: formData.department,
+            status: formData.status?.toLowerCase() === 'active' || formData.status === 'Active' ? 'active' : 'inactive'
+        };
         
-        setFaculty(faculty.map(facultyMember => 
-            facultyMember.id === formData.id ? {
-                ...facultyMember,
-                facultyNumber: formData.facultyNumber,
-                fullname: formData.fullname,
-                department: formData.department,
-                rfidNumber: formData.rfidNumber,
-                status: formData.status
-            } : facultyMember
-        ));
-        setIsUpdateModalOpen(false);
-        setSelectedItem(null);
+        router.patch(route('faculties.update', selectedItem.id), backendData, {
+            onSuccess: () => {
+                setIsUpdateModalOpen(false);
+                setSelectedItem(null);
+                toast.success('Faculty member updated successfully!');
+                // Refresh the page data to show the updated faculty immediately
+                router.get(route('faculties.index'), {
+                    search: searchTerm,
+                    status: selectedStatus !== 'All' ? selectedStatus.toLowerCase() : undefined
+                }, {
+                    preserveState: false,
+                    preserveScroll: true
+                });
+            },
+            onError: (errors) => {
+                console.error('Validation errors:', errors);
+                toast.error('Failed to update faculty member. Please check your input.');
+            }
+        });
     };
 
     const openUpdateModal = (facultyMember) => {
@@ -104,7 +164,22 @@ const Faculty = ({ auth }) => {
 
     const deleteFaculty = (id) => {
         if (window.confirm('Are you sure you want to delete this faculty member?')) {
-            setFaculty(faculty.filter(facultyMember => facultyMember.id !== id));
+            router.delete(route('faculties.destroy', id), {
+                onSuccess: () => {
+                    toast.success('Faculty member deleted successfully!');
+                    // Refresh the page data to remove the deleted faculty immediately
+                    router.get(route('faculties.index'), {
+                        search: searchTerm,
+                        status: selectedStatus !== 'All' ? selectedStatus.toLowerCase() : undefined
+                    }, {
+                        preserveState: false,
+                        preserveScroll: true
+                    });
+                },
+                onError: () => {
+                    toast.error('Failed to delete faculty member.');
+                }
+            });
         }
     };
 
@@ -157,7 +232,7 @@ const Faculty = ({ auth }) => {
                                 type="text"
                                 placeholder="Search faculty..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={handleSearch}
                                 className="pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-80"
                             />
                             <svg className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,7 +242,7 @@ const Faculty = ({ auth }) => {
                         
                         <select
                             value={selectedStatus}
-                            onChange={(e) => setSelectedStatus(e.target.value)}
+                            onChange={(e) => handleStatusFilter(e.target.value)}
                             className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                             <option value="All">All Status</option>
@@ -210,9 +285,6 @@ const Faculty = ({ auth }) => {
                                         >
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center">
-                                                    <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-lg mr-4">
-                                                        {facultyMember.facultyNumber.split('-')[2]}
-                                                    </div>
                                                     <div>
                                                         <div className="text-sm font-semibold text-gray-900">{facultyMember.fullname}</div>
                                                     </div>
@@ -235,12 +307,6 @@ const Faculty = ({ auth }) => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex justify-end space-x-2">
-                                                    <button className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200">
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
                                                     <button 
                                                         onClick={() => openUpdateModal(facultyMember)}
                                                         className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-all duration-200"
@@ -256,9 +322,6 @@ const Faculty = ({ auth }) => {
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                         </svg>
-                                                    </button>
-                                                    <button className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-medium rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all duration-200 transform hover:scale-105">
-                                                        Profile
                                                     </button>
                                                 </div>
                                             </td>
@@ -285,28 +348,40 @@ const Faculty = ({ auth }) => {
                 </div>
 
                 {/* Enhanced Pagination */}
-                {filteredFaculty.length > 0 && (
+                {filteredFaculty.length > 0 && faculties && (
                     <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 border-t border-gray-200">
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-gray-700">
-                                Showing <span className="font-medium">{filteredFaculty.length}</span> of <span className="font-medium">{faculty.length}</span> faculty members
+                                Showing <span className="font-medium">{faculties.from || 0}</span> to <span className="font-medium">{faculties.to || 0}</span> of <span className="font-medium">{faculties.total || 0}</span> faculty members
                             </div>
                             <div className="flex items-center space-x-2">
-                                <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200">
-                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                    Previous
-                                </button>
+                                {faculties.prev_page_url && (
+                                    <button 
+                                        onClick={() => router.get(faculties.prev_page_url)}
+                                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+                                    >
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                        Previous
+                                    </button>
+                                )}
                                 <div className="flex items-center space-x-1">
-                                    <button className="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-lg transition-colors duration-200">1</button>
+                                    <button className="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-lg transition-colors duration-200">
+                                        {faculties.current_page || 1}
+                                    </button>
                                 </div>
-                                <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200">
-                                    Next
-                                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
+                                {faculties.next_page_url && (
+                                    <button 
+                                        onClick={() => router.get(faculties.next_page_url)}
+                                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+                                    >
+                                        Next
+                                        <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -326,6 +401,20 @@ const Faculty = ({ auth }) => {
                 onClose={() => setIsUpdateModalOpen(false)}
                 onSubmit={handleUpdateFaculty}
                 faculty={selectedItem}
+            />
+
+            {/* Toast Container */}
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
             />
         </AdminLayout>
     );

@@ -25,14 +25,18 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::get('/admin/faculty', function () {
-    return Inertia::render('Admin/Faculty');
-})->name('admin.faculty');
-
 Route::get('/admin/logs', function () {
     return Inertia::render('Admin/Logs');
 })->name('admin.logs');
 
-Route::apiResource('admin/faculty', FacultyController::class);
+// Faculty management routes
+Route::middleware(['auth'])->group(function () {
+    Route::resource('faculties', FacultyController::class);
+    Route::post('faculties/bulk-delete', [FacultyController::class, 'bulkDelete'])->name('faculties.bulk-delete');
+    Route::patch('faculties/{faculty}/toggle-status', [FacultyController::class, 'toggleStatus'])->name('faculties.toggle-status');
+});
+
+// API routes for faculty
+Route::get('api/faculties/department/{department}', [FacultyController::class, 'getByDepartment']);
 
 require __DIR__.'/auth.php';
