@@ -25,12 +25,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::get('/admin/faculty', function () {
-    return Inertia::render('Admin/Faculty');
-})->name('admin.faculty');
-
 Route::get('/admin/logs', function () {
     return Inertia::render('Admin/Logs');
 })->name('admin.logs');
+
+Route::apiResource('admin/faculty', FacultyController::class);
 
 require __DIR__.'/auth.php';

@@ -70,7 +70,7 @@ const AddFacultyModal = ({ isOpen, onClose, onSubmit }) => {
                                     name="facultyNumber"
                                     value={formData.facultyNumber}
                                     onChange={handleChange}
-                                    placeholder="FAC-2023-001"
+                                    placeholder="Enter faculty number"
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                                     required
                                 />
@@ -83,7 +83,7 @@ const AddFacultyModal = ({ isOpen, onClose, onSubmit }) => {
                                     name="fullname"
                                     value={formData.fullname}
                                     onChange={handleChange}
-                                    placeholder="Dr. John Smith"
+                                    placeholder="Enter full name"
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                                     required
                                 />
@@ -118,7 +118,7 @@ const AddFacultyModal = ({ isOpen, onClose, onSubmit }) => {
                                     name="rfidNumber"
                                     value={formData.rfidNumber}
                                     onChange={handleChange}
-                                    placeholder="RFID-001-ABC123"
+                                    placeholder="Enter RFID number"
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                                     required
                                 />

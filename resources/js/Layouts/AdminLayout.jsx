@@ -185,7 +185,7 @@ export default function SuperAdminLayout({ children }) {
                         <MenuItem
                             icon={NotebookPen}
                             text="Faculty"
-                            href="/admin/faculty"
+                            href="/faculties"
                             isCollapsed={isCollapsed}
                         />
                         <MenuItem
